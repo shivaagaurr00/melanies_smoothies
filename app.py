@@ -70,4 +70,4 @@ if ingredients_list:
             st.warning("Nutrition data not found.")
 
     ingredients_string = ingredients_string.rstrip(", ")
-``
+
