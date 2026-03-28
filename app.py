@@ -10,7 +10,7 @@ st.title("🥤 Customize Your Smoothie! 🥤")
 st.write("Choose the fruits you want in your custom smoothie!")
 
 # ----------------------------
-# Fruit data: UI label vs API search value
+# Fruit data: UI display vs API search values
 # ----------------------------
 fruit_data = [
     {"FRUIT_NAME": "Apples", "SEARCH_ON": "Apple"},
@@ -25,7 +25,6 @@ fruit_data = [
     {"FRUIT_NAME": "Nectarine", "SEARCH_ON": "Nectarine"},
 ]
 
-# Convert to Pandas DataFrame
 pd_df = pd.DataFrame(fruit_data)
 
 # ----------------------------
@@ -37,7 +36,7 @@ if name_on_order:
     st.write("The name on your Smoothie will be:", name_on_order)
 
 # ----------------------------
-# Multiselect (limit 5)
+# Ingredients (limit 5)
 # ----------------------------
 ingredients_list = st.multiselect(
     "Choose up to 5 ingredients:",
@@ -46,7 +45,12 @@ ingredients_list = st.multiselect(
 )
 
 # ----------------------------
-# Show ingredients + nutrition info
+# Order filled status (✅ THIS IS THE KEY PART)
+# ----------------------------
+order_filled = st.checkbox("Mark this order as filled")
+
+# ----------------------------
+# Show nutrition information
 # ----------------------------
 if ingredients_list:
     ingredients_string = ""
@@ -54,7 +58,7 @@ if ingredients_list:
     for fruit_chosen in ingredients_list:
         ingredients_string += fruit_chosen + ", "
 
-        # ✅ Look up SEARCH_ON value using pandas .loc
+        # Look up API search value
         search_on = pd_df.loc[
             pd_df["FRUIT_NAME"] == fruit_chosen,
             "SEARCH_ON"
@@ -64,8 +68,7 @@ if ingredients_list:
             "The search value for",
             fruit_chosen,
             "is",
-            search_on,
-            "."
+            search_on
         )
 
         st.subheader(fruit_chosen + " Nutrition Information")
@@ -79,19 +82,22 @@ if ingredients_list:
                 use_container_width=True
             )
         else:
-            st.warning("Nutrition data not found for this fruit.")
+            st.warning("Nutrition data not found.")
 
     ingredients_string = ingredients_string.rstrip(", ")
     st.write("Your smoothie will include:", ingredients_string)
 
 # ----------------------------
-# Submit button
+# Submit order
 # ----------------------------
 st.divider()
 submit_order = st.button("Submit Order")
 
 if submit_order:
     if not name_on_order or not ingredients_list:
-        st.error("❌ Please enter a name and choose at least one ingredient.")
+        st.error("❌ Please enter a name and select at least one ingredient.")
     else:
-        st.success("✅ Your smoothie order has been placed!", icon="🎉")
+        st.success("✅ Order Submitted!", icon="🎉")
+        st.write("👤 Name:", name_on_order)
+        st.write("🥗 Ingredients:", ingredients_string)
+        st.write("📦 Order Filled:", order_filled)
