@@ -4,10 +4,15 @@ import pandas as pd
 import requests
 
 # -------------------------------------------------
-# ✅ Snowflake connection (Streamlit in Snowflake)
+# Try to connect to Snowflake (only works in Snowflake)
 # -------------------------------------------------
-cnx = st.connection("snowflake")
-session = cnx.session()
+session = None
+try:
+    cnx = st.connection("snowflake")
+    session = cnx.session()
+    snowflake_available = True
+except Exception:
+    snowflake_available = False
 
 # ----------------------------
 # App Title
@@ -48,12 +53,12 @@ ingredients_list = st.multiselect(
 )
 
 # ----------------------------
-# Order filled status (Streamlit controls this)
+# Order filled status
 # ----------------------------
 order_filled = st.checkbox("Mark this order as filled")
 
 # ----------------------------
-# Show nutrition info
+# Nutrition info
 # ----------------------------
 if ingredients_list:
     ingredients_string = ", ".join(ingredients_list)
@@ -79,7 +84,7 @@ if ingredients_list:
     st.write("Your smoothie will include:", ingredients_string)
 
 # ----------------------------
-# ✅ SUBMIT ORDER → INSERT INTO SNOWFLAKE
+# Submit Order
 # ----------------------------
 st.divider()
 submit_order = st.button("Submit Order")
@@ -88,18 +93,23 @@ if submit_order:
     if not name_on_order or not ingredients_list:
         st.error("❌ Please enter a name and choose at least one ingredient.")
     else:
-        insert_sql = """
-            INSERT INTO smoothies.public.orders
-            (name_on_order, ingredients, order_filled)
-            VALUES (%s, %s, %s)
-        """
+        if snowflake_available:
+            insert_sql = """
+                INSERT INTO smoothies.public.orders
+                (name_on_order, ingredients, order_filled)
+                VALUES (%s, %s, %s)
+            """
+            session.cursor().execute(
+                insert_sql,
+                (name_on_order, ingredients_string, order_filled)
+            )
+            st.success("✅ Order saved to Snowflake!", icon="🎉")
+        else:
+            st.warning(
+                "⚠️ Snowflake is not available in this environment. "
+                "The order was NOT saved."
+            )
 
-        session.cursor().execute(
-            insert_sql,
-            (name_on_order, ingredients_string, order_filled)
-        )
-
-        st.success("✅ Order saved to Snowflake!", icon="🎉")
         st.write("Name:", name_on_order)
         st.write("Ingredients:", ingredients_string)
         st.write("Order Filled:", order_filled)
