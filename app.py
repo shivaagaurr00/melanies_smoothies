@@ -3,6 +3,12 @@ import streamlit as st
 import pandas as pd
 import requests
 
+# -------------------------------------------------
+# ✅ Snowflake connection (Streamlit in Snowflake)
+# -------------------------------------------------
+cnx = st.connection("snowflake")
+session = cnx.session()
+
 # ----------------------------
 # App Title
 # ----------------------------
@@ -10,7 +16,7 @@ st.title("🥤 Customize Your Smoothie! 🥤")
 st.write("Choose the fruits you want in your custom smoothie!")
 
 # ----------------------------
-# Fruit data: UI display vs API search values
+# Fruit data (UI label vs API search value)
 # ----------------------------
 fruit_data = [
     {"FRUIT_NAME": "Apples", "SEARCH_ON": "Apple"},
@@ -28,15 +34,12 @@ fruit_data = [
 pd_df = pd.DataFrame(fruit_data)
 
 # ----------------------------
-# Name input
+# Name on smoothie
 # ----------------------------
 name_on_order = st.text_input("Name on Smoothie:")
 
-if name_on_order:
-    st.write("The name on your Smoothie will be:", name_on_order)
-
 # ----------------------------
-# Ingredients (limit 5)
+# Ingredient selection (max 5)
 # ----------------------------
 ingredients_list = st.multiselect(
     "Choose up to 5 ingredients:",
@@ -45,59 +48,58 @@ ingredients_list = st.multiselect(
 )
 
 # ----------------------------
-# Order filled status (✅ THIS IS THE KEY PART)
+# Order filled status (Streamlit controls this)
 # ----------------------------
 order_filled = st.checkbox("Mark this order as filled")
 
 # ----------------------------
-# Show nutrition information
+# Show nutrition info
 # ----------------------------
 if ingredients_list:
-    ingredients_string = ""
+    ingredients_string = ", ".join(ingredients_list)
 
     for fruit_chosen in ingredients_list:
-        ingredients_string += fruit_chosen + ", "
-
-        # Look up API search value
         search_on = pd_df.loc[
             pd_df["FRUIT_NAME"] == fruit_chosen,
             "SEARCH_ON"
         ].iloc[0]
 
-        st.write(
-            "The search value for",
-            fruit_chosen,
-            "is",
-            search_on
-        )
-
         st.subheader(fruit_chosen + " Nutrition Information")
 
-        api_url = "https://my.smoothiefroot.com/api/fruit/" + search_on
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(
+            "https://my.smoothiefroot.com/api/fruit/" + search_on,
+            timeout=10
+        )
 
         if response.status_code == 200:
-            st.dataframe(
-                response.json(),
-                use_container_width=True
-            )
+            st.dataframe(response.json(), width="stretch")
         else:
             st.warning("Nutrition data not found.")
 
-    ingredients_string = ingredients_string.rstrip(", ")
     st.write("Your smoothie will include:", ingredients_string)
 
 # ----------------------------
-# Submit order
+# ✅ SUBMIT ORDER → INSERT INTO SNOWFLAKE
 # ----------------------------
 st.divider()
 submit_order = st.button("Submit Order")
 
 if submit_order:
     if not name_on_order or not ingredients_list:
-        st.error("❌ Please enter a name and select at least one ingredient.")
+        st.error("❌ Please enter a name and choose at least one ingredient.")
     else:
-        st.success("✅ Order Submitted!", icon="🎉")
-        st.write("👤 Name:", name_on_order)
-        st.write("🥗 Ingredients:", ingredients_string)
-        st.write("📦 Order Filled:", order_filled)
+        insert_sql = """
+            INSERT INTO smoothies.public.orders
+            (name_on_order, ingredients, order_filled)
+            VALUES (%s, %s, %s)
+        """
+
+        session.cursor().execute(
+            insert_sql,
+            (name_on_order, ingredients_string, order_filled)
+        )
+
+        st.success("✅ Order saved to Snowflake!", icon="🎉")
+        st.write("Name:", name_on_order)
+        st.write("Ingredients:", ingredients_string)
+        st.write("Order Filled:", order_filled)
